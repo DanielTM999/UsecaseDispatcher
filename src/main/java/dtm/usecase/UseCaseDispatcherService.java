@@ -107,7 +107,11 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
 
     private Object initializeUseCaseObject(Class<?> clazz){
         try {
-            return instanceObjectDispatcherFactory.onCreate(clazz);
+            Object instance = instanceObjectDispatcherFactory.onCreate(clazz);
+            if(instance == null){
+                throw new InitializeUseCaseException("Erro ao Incializar usecase Object, a fabrica retornou 'null' verifique a implemtação da fabrica: "+instanceObjectDispatcherFactory.getClass());
+            }
+            return instance;
         } catch (InitializeUseCaseException initializeUseCaseException){
             throw initializeUseCaseException;
         }catch (Exception e) {
