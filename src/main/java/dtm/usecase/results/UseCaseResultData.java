@@ -1,6 +1,6 @@
 package dtm.usecase.results;
 
-import dtm.usecase.core.UseCaseResult;
+import dtm.usecase.core.result.UseCaseResult;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

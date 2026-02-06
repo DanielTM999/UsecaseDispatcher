@@ -1,4 +1,4 @@
-package dtm.usecase.core;
+package dtm.usecase.core.result;
 
 
 import java.util.function.Function;

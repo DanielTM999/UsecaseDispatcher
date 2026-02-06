@@ -1,4 +1,4 @@
-package dtm.usecase.core;
+package dtm.usecase.exceptions;
 
 public class UseCaseException extends RuntimeException{
     

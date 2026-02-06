@@ -4,21 +4,21 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+
 import dtm.usecase.annotatins.InitCase;
 import dtm.usecase.annotatins.UseCase;
-import dtm.usecase.core.PidUseCaseResult;
+import dtm.usecase.core.InstanceObjectDispatcherFactory;
+import dtm.usecase.core.result.PidUseCaseResult;
+import dtm.usecase.results.PidUseCaseResultConcrete;
 import dtm.usecase.core.UseCaseBase;
 import dtm.usecase.core.UseCaseDispatcher;
-import dtm.usecase.core.UseCaseException;
-import dtm.usecase.core.UseCaseResult;
-import dtm.usecase.core.exceptions.InitializeUseCaseException;
+import dtm.usecase.exceptions.UseCaseException;
+import dtm.usecase.core.result.UseCaseResult;
+import dtm.usecase.exceptions.InitializeUseCaseException;
 import dtm.usecase.enums.Retention;
 import dtm.usecase.results.UseCaseResultData;
 
@@ -26,9 +26,11 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
     private static final Map<String, CompletableFuture<Object>> useCasesAplication = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Object>> useCasesScoped;
+    private final InstanceObjectDispatcherFactory instanceObjectDispatcherFactory;
 
-    public UseCaseDispatcherService(){
-        useCasesScoped = new ConcurrentHashMap<>();
+    public UseCaseDispatcherService(InstanceObjectDispatcherFactory instanceObjectDispatcherFactory){
+        this.useCasesScoped = new ConcurrentHashMap<>();
+        this.instanceObjectDispatcherFactory = getFactoryOrDefault(instanceObjectDispatcherFactory);
     }
 
     @SafeVarargs
@@ -36,8 +38,8 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     public final List<PidUseCaseResult> dispatchList(Class<? extends UseCaseBase>... clazzList) {
         List<PidUseCaseResult> pidList = new ArrayList<>();
         for(Class<? extends UseCaseBase> useCaseBase : clazzList){
-            String pid = dispatcher(useCaseBase);
-            pidList.add(new PidUseCaseResult(pid, useCaseBase));
+            String pid = dispatch(useCaseBase);
+            pidList.add(new PidUseCaseResultConcrete(pid, useCaseBase));
         }
         return pidList;
     }
@@ -46,26 +48,26 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     public List<PidUseCaseResult> dispatchList(List<Class<? extends UseCaseBase>> clazzList, Object... args) {
         List<PidUseCaseResult> pidList = new ArrayList<>();
         for(Class<? extends UseCaseBase> useCaseBase : clazzList){
-            String pid = dispatcher(useCaseBase, args);
-            pidList.add(new PidUseCaseResult(pid, useCaseBase));
+            String pid = dispatch(useCaseBase, args);
+            pidList.add(new PidUseCaseResultConcrete(pid, useCaseBase));
         }
         return pidList;
     }
 
     @Override
-    public String dispatcher(Class<? extends UseCaseBase> clazz) {
+    public String dispatch(Class<? extends UseCaseBase> clazz) {
         String pid = generatePID(null);
-        return dispatcher(pid, clazz);
+        return dispatch(pid, clazz);
     }
 
     @Override
-    public String dispatcher(Class<? extends UseCaseBase> clazz, Object... args) {
+    public String dispatch(Class<? extends UseCaseBase> clazz, Object... args) {
         String pid = generatePID(null);
-        return dispatcher(pid, clazz, args);
+        return dispatch(pid, clazz, args);
     }
     
     @Override
-    public String dispatcher(String PID, Class<? extends UseCaseBase> clazz) {
+    public String dispatch(String PID, Class<? extends UseCaseBase> clazz) {
         String pid = generatePID(PID);
         Retention retention = getScope(clazz);
         injectToQueue(clazz, pid, getQueueByScope(retention), null);
@@ -73,7 +75,7 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     }
 
     @Override
-    public String dispatcher(String PID, Class<? extends UseCaseBase> clazz, Object... args) {
+    public String dispatch(String PID, Class<? extends UseCaseBase> clazz, Object... args) {
         String pid = generatePID(PID);
         Retention retention = getScope(clazz);
         injectToQueue(clazz, pid, getQueueByScope(retention), args);
@@ -91,16 +93,11 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     }
 
     private Object initializeUseCaseObject(Class<?> clazz){
-        Object entityObject = null;
         try {
-            if (clazz.getConstructors().length > 0 && clazz.getConstructors()[0].getParameterCount() > 0) {
-                throw new InitializeUseCaseException("A classe do caso de uso deve possuir apenas construtor vazio.");
-            }
-            entityObject = clazz.getDeclaredConstructor().newInstance();
-        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-            throw new InitializeUseCaseException(e);
+            return instanceObjectDispatcherFactory.onCreate(clazz);
+        } catch (Exception e) {
+            throw new InitializeUseCaseException("Erro ao Incializar usecase Object", e);
         }
-        return entityObject;
     }
 
     private Method getInitialMethod(Class<? extends UseCaseBase> clazz){
@@ -209,5 +206,13 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
         return retention == Retention.ANY ? useCasesAplication : useCasesScoped;
     }
 
-
+    private InstanceObjectDispatcherFactory getFactoryOrDefault(InstanceObjectDispatcherFactory instanceObjectDispatcherFactory){
+        if(instanceObjectDispatcherFactory != null) return instanceObjectDispatcherFactory;
+        return (clazz) -> {
+            if (clazz.getConstructors().length > 0 && clazz.getConstructors()[0].getParameterCount() > 0) {
+                throw new InitializeUseCaseException("A classe do caso de uso deve possuir apenas construtor vazio.");
+            }
+            return clazz.getDeclaredConstructor().newInstance();
+        };
+    }
 }
