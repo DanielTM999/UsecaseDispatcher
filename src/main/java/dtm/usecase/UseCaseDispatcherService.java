@@ -23,18 +23,30 @@ import dtm.usecase.enums.Retention;
 import dtm.usecase.results.UseCaseResultData;
 
 public class UseCaseDispatcherService implements UseCaseDispatcher{
-    private static final ExecutorService executorService = Executors.newCachedThreadPool();
+    private static final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
     private static final Map<String, CompletableFuture<Object>> useCasesAplication = new ConcurrentHashMap<>();
+
+    private final ExecutorService executorService;
     private final Map<String, CompletableFuture<Object>> useCasesScoped;
     private final InstanceObjectDispatcherFactory instanceObjectDispatcherFactory;
 
-    public UseCaseDispatcherService(InstanceObjectDispatcherFactory instanceObjectDispatcherFactory){
-        this.useCasesScoped = new ConcurrentHashMap<>();
-        this.instanceObjectDispatcherFactory = getFactoryOrDefault(instanceObjectDispatcherFactory);
+    public UseCaseDispatcherService(
+            InstanceObjectDispatcherFactory instanceObjectDispatcherFactory
+    ){
+       this(instanceObjectDispatcherFactory, EXECUTOR_SERVICE);
     }
 
-    @SafeVarargs
+    public UseCaseDispatcherService(
+            InstanceObjectDispatcherFactory instanceObjectDispatcherFactory,
+            ExecutorService executorService
+    ){
+        this.useCasesScoped = new ConcurrentHashMap<>();
+        this.instanceObjectDispatcherFactory = getFactoryOrDefault(instanceObjectDispatcherFactory);
+        this.executorService = executorService;
+    }
+
     @Override
+    @SafeVarargs
     public final List<PidUseCaseResult> dispatchList(Class<? extends UseCaseBase>... clazzList) {
         List<PidUseCaseResult> pidList = new ArrayList<>();
         for(Class<? extends UseCaseBase> useCaseBase : clazzList){
