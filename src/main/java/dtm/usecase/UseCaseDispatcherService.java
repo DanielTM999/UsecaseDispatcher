@@ -1,5 +1,6 @@
 package dtm.usecase;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -107,7 +108,9 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     private Object initializeUseCaseObject(Class<?> clazz){
         try {
             return instanceObjectDispatcherFactory.onCreate(clazz);
-        } catch (Exception e) {
+        } catch (InitializeUseCaseException initializeUseCaseException){
+            throw initializeUseCaseException;
+        }catch (Exception e) {
             throw new InitializeUseCaseException("Erro ao Incializar usecase Object", e);
         }
     }
@@ -221,10 +224,14 @@ public class UseCaseDispatcherService implements UseCaseDispatcher{
     private InstanceObjectDispatcherFactory getFactoryOrDefault(InstanceObjectDispatcherFactory instanceObjectDispatcherFactory){
         if(instanceObjectDispatcherFactory != null) return instanceObjectDispatcherFactory;
         return (clazz) -> {
-            if (clazz.getConstructors().length > 0 && clazz.getConstructors()[0].getParameterCount() > 0) {
-                throw new InitializeUseCaseException("A classe do caso de uso deve possuir apenas construtor vazio.");
+            Constructor<?>[] constructors = clazz.getConstructors();
+
+            for(Constructor<?> constructor : constructors){
+                if(constructor.getParameterCount() == 0){
+                    return constructor.newInstance();
+                }
             }
-            return clazz.getDeclaredConstructor().newInstance();
+            throw new InitializeUseCaseException("A classe do caso de uso deve possuir apenas construtor vazio.");
         };
     }
 }
